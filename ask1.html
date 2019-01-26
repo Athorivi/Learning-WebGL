@@ -1,0 +1,297 @@
+<html>
+
+<head>
+<title>Learning WebGL &mdash; lesson 2</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+
+<script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec4 vColor;   // This has changed from the 1st example
+
+    void main(void) {
+        gl_FragColor = vColor;   // This has changed from the 1st example
+    }
+</script>
+
+<script id="shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec4 aVertexColor;  // This has changed from the 1st example
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+
+    varying vec4 vColor; // This has changed from the 1st example
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        vColor = aVertexColor;  //This has changed from the 1st example
+    }
+</script>
+
+
+<script type="text/javascript">
+
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    var shaderProgram;
+
+    function initShaders() {
+        var fragmentShader = getShader(gl, "shader-fs");
+        var vertexShader = getShader(gl, "shader-vs");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");            // This has changed from the 1st example
+        gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);                                      // This has changed from the 1st example
+
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+    }
+
+
+    var mvMatrix = mat4.create();
+    var pMatrix = mat4.create();
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+    }
+
+
+    var octaVertexPositionBuffer;
+    var octaIndexPositionBuffer;
+    var octaVertexColorBuffer;
+
+    var pyramidVertexPositionBuffer;
+    var pyramidIndexPositionBuffer;
+    var pyramidVertexColorBuffer;
+
+    function initBuffers() {
+        octaVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, octaVertexPositionBuffer);
+        var vertices = [
+        	0.0, 0.0, 0.0,
+           -0.4, 1.0, 0.0,
+            0.4, 1.0, 0.0,
+            1.0, 0.4, 0.0,
+            1.0, -0.4, 0.0,
+            0.4, -1.0, 0.0,
+            -0.4, -1.0, 0.0,
+            -1.0, -0.4, 0.0,
+            -1.0, 0.4, 0.0
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        octaVertexPositionBuffer.itemSize = 3;
+        octaVertexPositionBuffer.numItems = 9;
+
+        octaIndexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, octaIndexPositionBuffer);
+        var indexes = [
+        1, 2, 0,
+        0, 2, 3,
+        3, 4, 0,
+        0, 4, 5,
+        5, 6, 0,
+        0, 6, 7,
+        7, 8, 0,
+        0, 8, 1
+        ];
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexes), gl.STATIC_DRAW);
+        octaIndexPositionBuffer.itemSize = 1;
+        octaIndexPositionBuffer.numItems = 24;
+
+        octaVertexColorBuffer = gl.createBuffer();                                       // This has changed from the 1st example
+        gl.bindBuffer(gl.ARRAY_BUFFER, octaVertexColorBuffer);                           // This has changed from the 1st example
+        var colors = [ 
+        	1.0, 1.0, 1.0, 1.0,                                                                      // This has changed from the 1st example
+            1.0, 0.0, 0.0, 1.0,                                                              // This has changed from the 1st example
+            1.0, 1.0, 0.0, 1.0,                                                              // This has changed from the 1st example
+            0.0, 1.0, 0.0, 1.0,
+            0.0, 1.0, 1.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
+            1.0, 0.0, 1.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 1.0, 0.0, 1.0
+                                                                   // This has changed from the 1st example
+        ];                                                                                   // This has changed from the 1st example
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+        octaVertexColorBuffer.itemSize = 4;
+        octaVertexColorBuffer.numItems = 9;
+
+
+        pyramidVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pyramidVertexPositionBuffer);
+        vertices = [
+             0.0,  1.0,  0.0,
+             1.0, -1.0, 1.0,
+            -1.0, -1.0,   1.0,
+            -1.0, -1.0,  -1.0, 
+             1.0, -1.0,  -1.0,
+             
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        pyramidVertexPositionBuffer.itemSize = 3;
+        pyramidVertexPositionBuffer.numItems = 5;
+
+        pyramidIndexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pyramidIndexPositionBuffer);
+        var indexes = [
+ 			0, 1, 2,
+ 			0, 2, 3,
+ 			0, 3, 4,
+ 			0, 4, 1,
+ 			1, 2, 3,
+ 			2, 3, 1
+
+        ];
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexes), gl.STATIC_DRAW);
+        pyramidIndexPositionBuffer.itemSize = 1;
+        pyramidIndexPositionBuffer.numItems = 18;
+
+        pyramidVertexColorBuffer = gl.createBuffer();                                      // This has changed from the 1st example
+        gl.bindBuffer(gl.ARRAY_BUFFER, pyramidVertexColorBuffer);                          // This has changed from the 1st example
+        colors = [
+        1.0, 1.0, 1.0, 1.0,
+        1.0, 0.0, 0.0, 1.0,
+        1.0, 1.0, 0.0, 1.0,
+        0.0, 1.0, 0.0, 1.0,
+        0.0, 0.0, 1.0, 1.0
+
+        ];                                // This has changed from the 1st example
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);         // This has changed from the 1st example
+        pyramidVertexColorBuffer.itemSize = 4;                                             // This has changed from the 1st example
+        pyramidVertexColorBuffer.numItems = 5;                                             // This has changed from the 1st example
+    }
+
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+        mat4.identity(mvMatrix);
+
+        mat4.translate(mvMatrix, [-1.5, 0.0, -7.0]);
+		
+        gl.bindBuffer(gl.ARRAY_BUFFER, octaVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, octaVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, octaVertexColorBuffer);                                                                               // This has changed from the 1st example
+        gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, octaVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);                  // This has changed from the 1st example
+
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, octaIndexPositionBuffer);
+		setMatrixUniforms();
+
+        gl.drawElements(gl.TRIANGLES, octaIndexPositionBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+
+        mat4.translate(mvMatrix, [2.5, 0.0, 0.0]);
+		mat4.rotate(mvMatrix, 0.5, [0, 1, 0]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, pyramidVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, pyramidVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, pyramidVertexColorBuffer);                                                                        // This has changed from the 1st example
+        gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, pyramidVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);            // This has changed from the 1st example
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pyramidIndexPositionBuffer);
+
+        setMatrixUniforms();
+        gl.drawElements(gl.TRIANGLES, pyramidIndexPositionBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+    }
+
+
+
+    function webGLStart() {
+        var canvas = document.getElementById("lesson02-canvas");
+        initGL(canvas);
+        initShaders();
+        initBuffers();
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        drawScene();
+    }
+
+</script>
+
+
+</head>
+
+
+<body onload="webGLStart();">
+    <a href="http://learningwebgl.com/blog/?p=134">&lt;&lt; Back to Lesson 2</a><br />
+
+    <canvas id="lesson02-canvas" style="border: none;" width="500" height="500"></canvas>
+
+    <br/>
+    <a href="http://learningwebgl.com/blog/?p=134">&lt;&lt; Back to Lesson 2</a><br />
+</body>
+
+</html>
